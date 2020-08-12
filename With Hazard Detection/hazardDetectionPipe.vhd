@@ -1,3 +1,4 @@
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -144,20 +145,28 @@ signal start: std_logic:='0';
 
 SIGNAL	writeData :  STD_LOGIC_vector(31 downto 0);
 --signal i : integer:=0;
-type romtype is array(10 downto 0) of std_logic_vector(31 downto 0);
-   signal rom: romtype:=("00001111000000000000000000000000",
-			"00001010001000010000000000000100",
-			"00001101000000000000000000010100",
-			--"00001110000000000000000000000000",
-			--"00001110000000000000000000000000",
-			"00001011010000111111111111110000",
-			"00000000000101000001000000000000",
-			"00000001010100010101000000000000",
-			"00000111000100110000000001100100",
-			"00000101000001000000000000000001",
-			"00000101000000100000000000001100",
-			"00000110000001010000000100101100",
-			"00000101000000010000000000000000");
+type romtype is array(8 downto 0) of std_logic_vector(31 downto 0);
+   signal rom: romtype:=("00001000000000100000000000001111",
+"00000101000000010000000000010100",
+"00001010000000100000000000001100",
+"00001010000000010000000000010000",
+"00000100000100100001000000000000",
+"00001001000001000000000000001100",
+"00000101001000100000000000000001",
+"00000011001001000011000000000000",
+"00001111000000000000000000000000");
+
+--"00000101000000010000000000000000",
+		--	"00000110000001010000000100101100",
+		--	"00000101000001000000000000000001",
+		--	"00000101000000100000000000001100",
+		--	"00000111000100110000000001100100",
+		--	"00000001010100010101000000000000",
+			--"00000000000101000001000000000000",
+			--"00001010001000010000000000000100",
+		--	"00001011010000111111111111101100",
+		--	"00001111000000000000000000000000",
+		--	"00001111000000000000000000000000");
 SIGNAL	PC_reg,pc_next, pc_before:  STD_LOGIC_vector(9 downto 0):="0000000000";
 
 TYPE STATE IS (codeapplysig,codeapply,Idle,memIns,halti,continue,waits, datamem,delay);
@@ -252,6 +261,7 @@ SIGNAL DataHazardCheckReg : STD_LOGIC:='0';
 SIGNAL DataHazardDetected : STD_LOGIC:='0';
 SIGNAL CJump_JalrHazardDetected : STD_LOGIC:='0';
 SIGNAL CBeqHazardDetected : STD_LOGIC:='0';
+signal halllt: STD_LOGIC:='0';
 begin
 
 
@@ -331,7 +341,7 @@ MEMcontrol2(4)<=noop;
 
 PCSrc<= MEMcontrol34(2) and zero34;
 
-PCPLUSFOUR1<=PCPLUSFOUR12 when (codemode='1' or MEMcontrol34(1)='1' OR MEMcontrol34(0)='1' or EXEcontrol2(7)='1' or DataHazardDetected='1') else
+PCPLUSFOUR1<=PCPLUSFOUR12 when (codemode='1' or MEMcontrol34(1)='1' OR MEMcontrol34(0)='1' or  WBcontroL45(4)='1' or DataHazardDetected='1') else
 		BeqAddress34 when PCSrc='1' else
 	ZeroExtendedOffset23(9 downto 0) when EXEcontrol23(6)='1' else------stage2
 	 RegReadData1_23(9 downto 0) when EXEcontrol23(1)='1' else
@@ -374,27 +384,21 @@ WriteRegData <= luiOut45 when WBcontrol45(2)='1' else
 
 PROCESS(CLK,RESET)
 variable finished: std_logic:='0';
-variable i : integer:=0;
+variable i : integer:=8;
 BEGIN
 	if( reset='1') then
 		pc_reg<="0000000000";
 		CPUSTATES<=codeapplysig;
-		i:=0;
+		i:=8;
 	elsif( clk'event and clk='1') then
 		noopsig<='0';
 		haltsig<='0';
 		regWR<='0';
 -------------------------------------------------------------------------------
-		if(MEMcontrol34(1)='1' OR MEMcontrol34(0)='1')then 
 		
-			--pcplusfour12<= "1111111100";
-			instruction12<="00001110000000000000000000000000";
-		else
-			pcplusfour12<=pcplusfour1 ;
-			instruction12<=instruction1;
-		end if;
 ------------------------------------------------------------------------------
-
+		
+		
 		if(DatahazardCheckReg='1')then
 			
 			if(((sourceReg) = (DataHazardRegAddr2(2)(3 downto 0)) and DataHazardRegAddr2(2)(4)='0' ) or ((targetReg2) = (DataHazardRegAddr2(2)(3 downto 0))and DataHazardRegAddr2(2)(4)='0') OR ((sourceReg) = (DataHazardRegAddr2(1)(3 downto 0))and DataHazardRegAddr2(1)(4)='0') or ((targetReg2) = (DataHazardRegAddr2(1)(3 downto 0))and DataHazardRegAddr2(1)(4)='0') OR ((sourceReg) = (DataHazardRegAddr2(0)(3 downto 0))and DataHazardRegAddr2(0)(4)='0') or ((targetReg2) = (DataHazardRegAddr2(0)(3 downto 0))and DataHazardRegAddr2(0)(4)='0')) then
@@ -582,7 +586,20 @@ BEGIN
 ------------------------------------------------------------------------------
 		--pcplusfour12<=pcplusfour1 ;
 		
-
+		if(MEMcontrol34(1)='1' OR MEMcontrol34(0)='1')then 
+		
+			--pcplusfour12<= "1111111100";
+			instruction12<="00001110000000000000000000000000";
+		else
+			pcplusfour12<=pcplusfour1 ;
+			instruction12<=instruction1;
+		end if;
+		if(halllt='1' )then
+			instruction12<="00001111000000000000000000000000";
+		else
+			pcplusfour12<=pcplusfour1 ;
+			instruction12<=instruction1;
+		end if;
 		--pcplusfour23<=pcplusfour12 ;
 		--pcplusfour34<=pcplusfour23 ;
 		pcplusfour45<=pcplusfour34 ;
@@ -633,9 +650,9 @@ BEGIN
 			MemWritepro<= '0';
 			codemode<='1';
 			textsection<=std_logic_vector(unsigned( textsection)+4);
-			i:=i+1;
+			i:=i-1;
 			cpustates<=codeapplysig;
-			if(i=11) then
+			if(i=-1) then
 				finished:='1';
 				i:=0;
 			end if;
@@ -651,16 +668,16 @@ BEGIN
 		when waits =>	
 			i:=i+1;
 			MemReadpro <= '1';
-			if(i=2)then
-				start<='1';
+			if(i=1)then
+			start<='1';
 			end if;
 			cpustates<=waits;
-			IF( WBcontrol2(4)='1') then
+			IF( WBcontrol45(4)='1') then
 				cpustates<=halti;
 			end if;
 			
 		when halti => 
-			
+			halllt<='1';
 			haltsig<='1';
 		when others => 
 		
@@ -672,4 +689,3 @@ BEGIN
 
 
 end;
-
