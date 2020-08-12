@@ -140,15 +140,49 @@ signal regWritecon : std_logic;
 signal regWritepro : std_logic;
 signal writeIns : std_logic;
 signal insmem_regwrite: std_logic;
-signal datamem_regread: std_logic;
+signal REGwr: std_logic:='0';
+
 SIGNAL	writeData :  STD_LOGIC_vector(31 downto 0);
 --signal i : integer:=0;
-type romtype is array(6 downto 0) of std_logic_vector(31 downto 0);
-   signal rom: romtype:=("00001011001101011111111111100100","00001100000010100000000000000000","00001111000000000000000000000000","00000101000100110000000000101000","00001110000000000000000000000000","00001000000000100000000000011111","00001000000000010000000000001010");
+type romtype is array(15 downto 0) of std_logic_vector(31 downto 0);
+   signal rom: romtype:=("00001000000000100000000000001111",
+			 "00000101000000010000000000010100",
+			"00001110000000000000000000000000",
+			"00001110000000000000000000000000",
+			"00001010000000100000000000001100",
+			"00001010000000010000000000010000",
+			"00000100000100100001000000000000",
+			"00001110000000000000000000000000",
+			"00001110000000000000000000000000",
+			"00001001000001000000000000001100",
+			"00000101001000100000000000000001",
+			"00001110000000000000000000000000",
+			"00001110000000000000000000000000",
+			"00001110000000000000000000000000",
+			"00000011001001000011000000000000",
+			"00001111000000000000000000000000");
+
+--"00000101000000010000000000000000",
+			--"00000110000001010000000100101100",
+			--"00000101000001000000000000000001",
+			--"00000101000000100000000000001100",
+			--"00000111000100110000000001100100",
+			--"00000001010100010101000000000000",
+			--"00000000000101000001000000000000",
+			--"00001010001000010000000000000100",
+			--"00001011010000111111111111101100",
+			--"00001110000000000000000000000000",
+			--"00001110000000000000000000000000",
+			--"00001110000000000000000000000000",
+			--"00001111000000000000000000000000");
 SIGNAL	PC_reg,pc_next, pc_before:  STD_LOGIC_vector(9 downto 0):="0000000000";
 
 TYPE STATE IS (codeapplysig,codeapply,Idle,memIns,halti,continue,waits, datamem,delay);
 signal cpustates : state := codeapplysig ;
+
+SIGNAL	OPCode23:  STD_LOGIC_vector(3 downto 0);
+SIGNAL	OPCode34:  STD_LOGIC_vector(3 downto 0);
+SIGNAL	OPCode45:  STD_LOGIC_vector(3 downto 0);
 
 ----------------------first stage ------------------------------------------------
 
@@ -246,10 +280,13 @@ uutMemory : MEMORY port map (clk,reset,MemWrite,MemRead,WriteMemAdd,ReadMemAdd,W
 ------------------------------------------------codemode
 memWrite<=  memWritepro or MEMcontrol34(0);
 memRead<=  memReadpro or MEMcontrol34(1);
-RegWrite<=WBcontrol45(0); --Regwritepro when waitneeded='1' else
+RegWrite<=WBcontrol45(0) WHEN REGwr='1' else
+		'0'; --Regwritepro when waitneeded='1' else
 	  
 ---------------------------------------------
 OPcode<= instruction12(27 downto 24);
+
+
 sourceReg <= instruction12(23 downto 20);
 targetReg2 <= instruction12(19 downto 16);
 destReg2 <= instruction12(15 downto 12);
@@ -272,7 +309,7 @@ EXEcontrol2(7)<=halt;
 EXEcontrol2(8)<=noop;
 EXEcontrol2(9)<=extend;
 
-BeqAddress3<= std_logic_vector(signed(pcplusfour23) + signed(signedExtendedOffset23(9 downto 0)));
+BeqAddress3<= std_logic_vector(signed(pcplusfour23)+ 4 + signed(signedExtendedOffset23(9 downto 0)));
 ALUData1 <=RegReadData1_23;
 ALUData2 <=RegReadData2_23 when EXEcontrol23(0)='0' else
 	   signedExtendedOffset23 when EXEcontrol23(9)='1' else
@@ -292,9 +329,9 @@ MEMcontrol2(2)<=branch;
 MEMcontrol2(3)<=halt;
 MEMcontrol2(4)<=noop;
 
-PCSrc<= MEMcontrol2(2) and zero34;
+PCSrc<= MEMcontrol34(2) and zero34;
 
-PCPLUSFOUR1<=PCPLUSFOUR12 when (codemode='1' or MEMcontrol34(1)='1' OR MEMcontrol34(0)='1') else
+PCPLUSFOUR1<=PCPLUSFOUR12 when (codemode='1' or MEMcontrol34(1)='1' OR MEMcontrol34(0)='1' or EXEcontrol2(7)='1' ) else
 	ZeroExtendedOffset23(9 downto 0) when EXEcontrol23(6)='1' else------stage2
 	 RegReadData1_23(9 downto 0) when EXEcontrol23(1)='1' else
 	BeqAddress34 when PCSrc='1' else
@@ -302,11 +339,11 @@ PCPLUSFOUR1<=PCPLUSFOUR12 when (codemode='1' or MEMcontrol34(1)='1' OR MEMcontro
 
 MemReadData4<=ReadMemData WHEN (MEMcontrol34(1)='1' OR MEMcontrol34(0)='1')ELSE
 		MemReadData4;-------------------------codemode
-instruction1<=ReadMemData WHEN (MEMcontrol34(1)='0' OR MEMcontrol34(0)='0')ELSE
+instruction1<=ReadMemData WHEN (MEMcontrol34(1)='0' and MEMcontrol34(0)='0')ELSE
 		instruction1;-------------------------codemode
 
 
-ReadMemAdd <= std_logic_vector(unsigned(PCPLUSFOUR1) + unsigned(TEXTSECTION)) when (MEMcontrol34(1)='0' OR MEMcontrol34(0)='0') else
+ReadMemAdd <= std_logic_vector(unsigned(PCPLUSFOUR1) + unsigned(TEXTSECTION)) when (MEMcontrol34(1)='0' and MEMcontrol34(0)='0') else
 		(ALUResult34(9 downto 0));
 WriteMemAdd <= std_logic_vector(unsigned(PCPLUSFOUR1) + unsigned(TEXTSECTION)) when codemode='1' else
 		(ALUResult34(9 downto 0));
@@ -330,31 +367,45 @@ WriteRegData <= luiOut45 when WBcontrol45(2)='1' else
 
 PROCESS(CLK,RESET)
 variable finished: std_logic:='0';
-variable i : integer:=0;
+variable i : integer:=15;
 BEGIN
 
 	if( reset='1') then
 		pc_reg<="0000000000";
 		CPUSTATES<=codeapplysig;
-		i:=0;
+		i:=15;
 	elsif( clk'event and clk='1') then
 		noopsig<='0';
 		haltsig<='0';
+		regWR<='0';
 		
 -------------------------------------------------------------------------------
-		if(MEMcontrol34(1)='1' OR MEMcontrol34(0)='1')then 
+		if(MEMcontrol34(1)='1' OR MEMcontrol34(0)='1')then           --structural hazard checking
 		
-			pcplusfour12<= "0000000000";
+			--pcplusfour12<= "1111111100";
 			instruction12<="00001110000000000000000000000000";
 		else
 			pcplusfour12<=pcplusfour1 ;
 			instruction12<=instruction1;
 		end if;
+		--if(codemode='1')then 
+		
+			--pcplusfour12<= "1111111100";
+		--else
+		
+			--pcplusfour12<=pcplusfour1 ;
+--
+		--end if;
 
-		pcplusfour23<= pcplusfour12;
-		pcplusfour34<= pcplusfour23;
-		pcplusfour45<= pcplusfour34;
+		pcplusfour12<=pcplusfour1 ;
+		pcplusfour23<=pcplusfour12 ;
+		pcplusfour34<=pcplusfour23 ;
+		pcplusfour45<=pcplusfour34 ;
 
+		opcode23<=opcode;
+		opcode34<=opcode23;	
+		opcode45<= opcode45;
+	
 		EXEcontrol23<=EXEcontrol2;
 
 		MEMcontrol23<=MEMcontrol2;
@@ -396,17 +447,18 @@ BEGIN
 			MemWritepro<= '0';
 			codemode<='1';
 			textsection<=std_logic_vector(unsigned( textsection)+4);
-			i:=i+1;
+			i:=i-1;
 			cpustates<=codeapplysig;
-			if(i=7) then
+			if(i=-1) then
 				finished:='1';
-				i:=0;
+				i:=15;
 			end if;
 
 			if(finished = '1') then
 				textsection<="0011001000";
+				pcplusfour12<= "1111111100";
 				cpustates<=waits;
-				writeIns<='0';
+				--writeIns<='0';
 				MemReadpro <= '1';
 				codemode<='0';
 			end if;
@@ -414,14 +466,21 @@ BEGIN
 			MemReadpro <= '1';
 		--	codeMode<='1';
 			cpustates<=waits;
+			IF( halt='1') then
+				cpustates<=halti;
+			end if;
 			--instruction1<= ReadMemData;
 			--waitneeded<='0';
-		when others => 
-		end case;
-		--when halti => 
+		when halti => 
 			--	waitneeded<='0';
-			--	haltsig<='1';
+			haltsig<='1';
+		when others => 
+		
+		end case;
+	elsif( clk'event and clk='0') then
+		regWR<='1';
 	end if;
 	end process;
+
 
 end;
